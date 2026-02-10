@@ -8,7 +8,7 @@ function genId() {
   return `inst_${Date.now()}_${instanceCounter++}`;
 }
 
-const STORAGE_KEY = 'floorplan-planner-designs';
+const STORAGE_KEY = 'floorist-designs';
 
 // ─── localStorage helpers ───────────────────────────────────────────────────
 
@@ -1156,7 +1156,7 @@ export function App() {
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
             </svg>
-            FloorPlan Planner
+            Floorist
           </h1>
           <p className="text-indigo-200 text-xs mt-0.5">Drag & drop furniture placement</p>
         </div>
