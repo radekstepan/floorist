@@ -1217,44 +1217,62 @@ export function App() {
           <p className="text-indigo-200 text-xs mt-0.5">Drag & drop furniture placement</p>
         </div>
 
-        {/* Upload + Saved designs */}
-        <div className="px-3 py-3 border-b border-gray-100 space-y-2">
-          <label className="flex items-center justify-center gap-2 cursor-pointer bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium rounded-lg py-2.5 px-3 transition border border-indigo-200 border-dashed">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            {floorplanImg ? 'Change Floorplan' : 'Upload Floorplan'}
-            <input type="file" accept="image/*" className="hidden" onChange={handleUpload} />
-          </label>
+        {/* Management & Designs */}
+        <div className="px-3 py-3 border-b border-gray-100 space-y-3">
+          {/* Saved Designs Browser */}
           {savedDesigns.length > 0 && (
             <button
               onClick={() => setShowDesignsPanel(true)}
-              className="w-full flex items-center justify-center gap-2 bg-gray-50 hover:bg-gray-100 text-gray-600 font-medium rounded-lg py-2 px-3 transition border border-gray-200"
+              className="w-full flex items-center justify-between gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold rounded-lg py-2 px-3 transition border border-indigo-200 shadow-sm group"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-              Saved Designs ({savedDesigns.length})
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+                <span className="text-sm">Saved Designs</span>
+              </div>
+              <span className="bg-indigo-200 text-indigo-800 text-[10px] px-2 py-0.5 rounded-full group-hover:bg-indigo-300 transition-colors">
+                {savedDesigns.length}
+              </span>
             </button>
           )}
-        </div>
 
-        {/* Auto-save indicator + design name */}
-        {hasUploaded && (
-          <div className="px-3 py-2 border-b border-gray-100 bg-green-50/50">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <span className="text-[10px] text-green-700 font-medium">Auto-saving</span>
+          {/* Change Floorplan */}
+          <label className={cn(
+            "flex items-center justify-center gap-2 cursor-pointer font-medium rounded-lg py-2 px-3 transition border",
+            floorplanImg 
+              ? "bg-white hover:bg-gray-50 text-gray-600 border-gray-200 text-xs shadow-sm" 
+              : "bg-indigo-600 hover:bg-indigo-700 text-white border-transparent py-3 shadow-md"
+          )}>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <span className={cn(floorplanImg ? "" : "text-sm font-bold")}>
+              {floorplanImg ? 'Change Floorplan' : 'Start with a Floorplan'}
+            </span>
+            <input type="file" accept="image/*" className="hidden" onChange={handleUpload} />
+          </label>
+
+          {/* Current Design Info */}
+          {hasUploaded && (
+            <div className="pt-2.5 border-t border-gray-100 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Active Design</span>
+                <div className="flex items-center gap-1.5 bg-green-50 px-1.5 py-0.5 rounded-full border border-green-100">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                  <span className="text-[10px] text-green-700 font-bold uppercase">Live</span>
+                </div>
+              </div>
+              <input
+                type="text"
+                value={designName}
+                onChange={(e) => setDesignName(e.target.value)}
+                className="w-full px-2.5 py-2 text-xs bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 text-gray-800 font-bold transition-all shadow-inner"
+                placeholder="Name your design..."
+              />
             </div>
-            <input
-              type="text"
-              value={designName}
-              onChange={(e) => setDesignName(e.target.value)}
-              className="w-full mt-1 px-2 py-1 text-xs bg-white border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-indigo-300 text-gray-700 font-medium"
-              placeholder="Design name..."
-            />
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Tools */}
         <div className="px-3 py-2 border-b border-gray-100 space-y-1.5">
