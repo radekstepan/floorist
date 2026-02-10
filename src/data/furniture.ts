@@ -69,6 +69,28 @@ export const furnitureCatalog: FurnitureTemplate[] = [
     shape: 'rect',
   },
   {
+    id: 'bed-murphy-queen',
+    name: 'Murphy Bed - Queen',
+    category: 'Bedroom',
+    icon: '🛏️',
+    color: '#e2e8f0',
+    widthInches: 65.5,
+    depthInches: 15.875,
+    shape: 'rect',
+  },
+  {
+    id: 'murphy-office-queen',
+    name: 'Murphy Office - Queen',
+    category: 'Bedroom',
+    icon: '🏢',
+    color: '#cbd5e1',
+    widthInches: 109.5,
+    depthInches: 90.875,
+    shape: 'L',
+    cutoutWidthInches: 79.5, // 109.5 - 30" desk width
+    cutoutDepthInches: 75, // desk extends 75" from the unit
+  },
+  {
     id: 'nightstand',
     name: 'Nightstand',
     category: 'Bedroom',
@@ -153,6 +175,16 @@ export const furnitureCatalog: FurnitureTemplate[] = [
     color: '#4b5563',
     widthInches: 21,
     depthInches: 20.5,
+    shape: 'rect',
+  },
+  {
+    id: 'hemnes-bookcase',
+    name: 'IKEA HEMNES Bookcase',
+    category: 'Office',
+    icon: '📚',
+    color: '#a1a1aa',
+    widthInches: 90.125,
+    depthInches: 14.625,
     shape: 'rect',
   },
 
