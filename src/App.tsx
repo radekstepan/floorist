@@ -644,6 +644,13 @@ export function App() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (
+        document.activeElement?.tagName === 'INPUT' ||
+        document.activeElement?.tagName === 'TEXTAREA'
+      ) {
+        return;
+      }
+
       if (!selectedId) return;
       if (e.key === 'Delete' || e.key === 'Backspace') {
         setPlaced((prev) => prev.filter((p) => p.instanceId !== selectedId));
@@ -686,6 +693,27 @@ export function App() {
           };
           setPlaced((prev) => [...prev, newItem]);
           setSelectedId(newItem.instanceId);
+        }
+      }
+
+      if (e.key.startsWith('Arrow')) {
+        const step = e.shiftKey ? 12 : 1; // 12 inches vs 1 inch
+        const moveAmount = step * (scale.pixelsPerInch || 4);
+
+        let dx = 0;
+        let dy = 0;
+        if (e.key === 'ArrowUp') dy = -moveAmount;
+        if (e.key === 'ArrowDown') dy = moveAmount;
+        if (e.key === 'ArrowLeft') dx = -moveAmount;
+        if (e.key === 'ArrowRight') dx = moveAmount;
+
+        if (dx !== 0 || dy !== 0) {
+          e.preventDefault();
+          setPlaced((prev) =>
+            prev.map((p) =>
+              p.instanceId === selectedId ? { ...p, x: p.x + dx, y: p.y + dy } : p
+            )
+          );
         }
       }
     };
