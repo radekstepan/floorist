@@ -188,7 +188,17 @@ export const furnitureCatalog: FurnitureTemplate[] = [
     shape: 'rect',
   },
 
-  // Misc
+  // Outdoor
+  {
+    id: 'deck',
+    name: 'Deck',
+    category: 'Outdoor',
+    icon: '🪵',
+    color: '#a8a29e',
+    widthInches: 130, // 10'10"
+    depthInches: 104, // 8'8"
+    shape: 'rect',
+  },
   {
     id: 'plant',
     name: 'Indoor Plant',
