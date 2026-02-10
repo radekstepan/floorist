@@ -114,7 +114,7 @@ export const furnitureCatalog: FurnitureTemplate[] = [
   // Office
   {
     id: 'desk-rect',
-    name: 'Motion Series - Standing Desk',
+    name: 'Motion Standing Desk',
     category: 'Office',
     icon: '🖥️',
     color: '#d1d5db',
@@ -147,13 +147,13 @@ export const furnitureCatalog: FurnitureTemplate[] = [
   },
   {
     id: 'chair-office',
-    name: 'Office Chair',
+    name: 'Obusforme Chair',
     category: 'Office',
     icon: '💺',
     color: '#4b5563',
-    widthInches: 26,
-    depthInches: 26,
-    shape: 'circle',
+    widthInches: 21,
+    depthInches: 20.5,
+    shape: 'rect',
   },
 
   // Bathroom
