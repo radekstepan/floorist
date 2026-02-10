@@ -9,6 +9,7 @@ export interface FurnitureTemplate {
   shape: 'rect' | 'circle' | 'L' | 'U';
   cutoutWidthInches?: number;
   cutoutDepthInches?: number;
+  url?: string;
 }
 
 export interface PlacedFurniture {

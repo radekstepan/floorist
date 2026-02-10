@@ -1474,7 +1474,23 @@ export function App() {
                       <span className="text-sm">{tmpl.icon}</span>
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium text-gray-800 truncate">{tmpl.name}</p>
+                      <div className="flex items-center gap-1.5 overflow-hidden">
+                        <p className="text-xs font-medium text-gray-800 truncate">{tmpl.name}</p>
+                        {tmpl.url && (
+                          <a
+                            href={tmpl.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="flex-shrink-0 text-indigo-500 hover:text-indigo-700 transition"
+                            title="View Product"
+                          >
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                          </a>
+                        )}
+                      </div>
                       <p className="text-[10px] text-gray-400">
                         {tmpl.widthInches}"×{tmpl.depthInches}"
                         <span className="ml-1">
@@ -1649,8 +1665,25 @@ export function App() {
                 >
                   {selectedTemplate.icon}
                 </div>
-                <div>
-                  <p className="font-semibold text-gray-800 text-xs">{selectedTemplate.name}</p>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <p className="font-semibold text-gray-800 text-xs truncate">
+                      {selectedTemplate.name}
+                    </p>
+                    {selectedTemplate.url && (
+                      <a
+                        href={selectedTemplate.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-shrink-0 text-indigo-500 hover:text-indigo-700 transition"
+                        title="View Product"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </a>
+                    )}
+                  </div>
                   <p className="text-[10px] text-gray-400">{selectedTemplate.category}</p>
                 </div>
               </div>
