@@ -1,6 +1,6 @@
 import { FurnitureTemplate } from '../types';
 
-export const categories = ['Living Room', 'Bedroom', 'Dining', 'Office', 'Bathroom', 'Outdoor'];
+export const categories = ['Living Room', 'Bedroom', 'Dining', 'Office', 'Bathroom', 'Outdoor', 'Other'];
 
 export const furnitureCatalog: FurnitureTemplate[] = [
   // Living Room
@@ -249,6 +249,18 @@ export const furnitureCatalog: FurnitureTemplate[] = [
     color: '#f5f5f4',
     widthInches: 96,
     depthInches: 120,
+    shape: 'rect',
+  },
+
+  // Other
+  {
+    id: 'car-mazda-6',
+    name: '2017 Mazda 6',
+    category: 'Other',
+    icon: '🚗',
+    color: '#6b7280',
+    widthInches: 72.4,
+    depthInches: 191.5,
     shape: 'rect',
   }
 ];
