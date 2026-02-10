@@ -45,4 +45,5 @@ export interface SavedDesign {
   scale: ScaleConfig;
   canvasWidth: number;
   canvasHeight: number;
+  exportRects?: ExportRect[];
 }

@@ -266,6 +266,7 @@ export function App() {
     startY: number;
   }>({ isDrawing: false, startX: 0, startY: 0 });
   const [exportRect, setExportRect] = useState<ExportRect | null>(null);
+  const [savedExportRects, setSavedExportRects] = useState<ExportRect[]>([]);
 
   // Canvas dimensions
   const [canvasSize, setCanvasSize] = useState({ width: 1200, height: 800 });
@@ -304,6 +305,7 @@ export function App() {
         scale: scale,
         canvasWidth: canvasSize.width,
         canvasHeight: canvasSize.height,
+        exportRects: savedExportRects,
       };
 
       if (!currentDesignId) {
@@ -329,7 +331,7 @@ export function App() {
         clearTimeout(autoSaveTimerRef.current);
       }
     };
-  }, [placed, scale, floorplanDataUrl, canvasSize, hasUploaded, currentDesignId, designName, floorplanImg]);
+  }, [placed, scale, floorplanDataUrl, canvasSize, hasUploaded, currentDesignId, designName, floorplanImg, savedExportRects]);
 
   // ─── Load a saved design ─────────────────────────────────────────────────
 
@@ -347,6 +349,7 @@ export function App() {
       setShowDesignsPanel(false);
       setSelectedId(null);
       setViewOffset({ x: 0, y: 0 });
+      setSavedExportRects(design.exportRects || []);
 
       const container = containerRef.current;
       if (container) {
@@ -390,6 +393,8 @@ export function App() {
     setZoomLevel(1);
     setShowDesignsPanel(false);
     setMode('select');
+    setSavedExportRects([]);
+    setExportRect(null);
   }, []);
 
   // ─── Upload handler ──────────────────────────────────────────────────────
@@ -617,8 +622,21 @@ export function App() {
 
     if (mode === 'export') {
       exportRef.current.isDrawing = false;
+      if (exportRect && exportRect.width > 10 && exportRect.height > 10) {
+        setSavedExportRects((prev) => {
+          const exists = prev.some(
+            (r) =>
+              Math.abs(r.x - exportRect.x) < 2 &&
+              Math.abs(r.y - exportRect.y) < 2 &&
+              Math.abs(r.width - exportRect.width) < 2 &&
+              Math.abs(r.height - exportRect.height) < 2
+          );
+          if (exists) return prev;
+          return [...prev, exportRect];
+        });
+      }
     }
-  }, [mode]);
+  }, [mode, exportRect]);
 
   // ─── Zoom with wheel ─────────────────────────────────────────────────────
 
@@ -880,14 +898,25 @@ export function App() {
     }
 
     // Export rectangle
-    if (exportRect) {
-      ctx.strokeStyle = '#10b981';
-      ctx.lineWidth = 2 / zoomLevel;
-      ctx.setLineDash([6 / zoomLevel, 4 / zoomLevel]);
-      ctx.strokeRect(exportRect.x, exportRect.y, exportRect.width, exportRect.height);
-      ctx.setLineDash([]);
-      ctx.fillStyle = 'rgba(16, 185, 129, 0.08)';
-      ctx.fillRect(exportRect.x, exportRect.y, exportRect.width, exportRect.height);
+    if (mode === 'export') {
+      // Saved areas
+      savedExportRects.forEach((rect) => {
+        ctx.strokeStyle = '#10b98188';
+        ctx.lineWidth = 1 / zoomLevel;
+        ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+        ctx.fillStyle = 'rgba(16, 185, 129, 0.03)';
+        ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+      });
+
+      if (exportRect) {
+        ctx.strokeStyle = '#10b981';
+        ctx.lineWidth = 2 / zoomLevel;
+        ctx.setLineDash([6 / zoomLevel, 4 / zoomLevel]);
+        ctx.strokeRect(exportRect.x, exportRect.y, exportRect.width, exportRect.height);
+        ctx.setLineDash([]);
+        ctx.fillStyle = 'rgba(16, 185, 129, 0.08)';
+        ctx.fillRect(exportRect.x, exportRect.y, exportRect.width, exportRect.height);
+      }
     }
 
     ctx.restore();
@@ -901,7 +930,7 @@ export function App() {
       12,
       displayH - 12
     );
-  }, [floorplanImg, placed, selectedId, scale, viewOffset, zoomLevel, canvasSize, mode, exportRect, showDimensions, calibStep, calibP1, calibP2]);
+  }, [floorplanImg, placed, selectedId, scale, viewOffset, zoomLevel, canvasSize, mode, exportRect, savedExportRects, showDimensions, calibStep, calibP1, calibP2]);
 
   useEffect(() => {
     const id = requestAnimationFrame(render);
@@ -1274,10 +1303,76 @@ export function App() {
 
         {/* Export panel */}
         {mode === 'export' && (
-          <div className="px-3 py-3 border-b border-gray-100 bg-emerald-50 space-y-2">
-            <p className="text-xs font-semibold text-emerald-800">📐 Export Region</p>
+          <div className="px-3 py-3 border-b border-gray-100 bg-emerald-50 space-y-3">
+            <div className="flex items-baseline justify-between">
+              <p className="text-xs font-semibold text-emerald-800">📐 Export Region</p>
+              {savedExportRects.length > 0 && (
+                <button
+                  onClick={() => setSavedExportRects([])}
+                  className="text-[10px] text-emerald-600 hover:text-emerald-800 transition underline"
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
+
+            {savedExportRects.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-[10px] uppercase font-bold text-emerald-700 opacity-60">Saved Areas</p>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {savedExportRects.map((rect, idx) => {
+                    const isActive =
+                      exportRect &&
+                      exportRect.x === rect.x &&
+                      exportRect.y === rect.y &&
+                      exportRect.width === rect.width &&
+                      exportRect.height === rect.height;
+                    return (
+                      <div key={idx} className="group relative">
+                        <button
+                          onClick={() => setExportRect(rect)}
+                          className={cn(
+                            'w-full px-1.5 py-1 text-[10px] rounded border transition-all text-center truncate',
+                            isActive
+                              ? 'bg-emerald-600 border-emerald-600 text-white shadow-sm'
+                              : 'bg-white border-emerald-200 text-emerald-700 hover:border-emerald-400'
+                          )}
+                        >
+                          Area {idx + 1}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const rectToDelete = savedExportRects[idx];
+                            setSavedExportRects((prev) => prev.filter((_, i) => i !== idx));
+                            // If we're deleting the currently active rect, clear it
+                            if (
+                              exportRect &&
+                              exportRect.x === rectToDelete.x &&
+                              exportRect.y === rectToDelete.y &&
+                              exportRect.width === rectToDelete.width &&
+                              exportRect.height === rectToDelete.height
+                            ) {
+                              setExportRect(null);
+                            }
+                          }}
+                          className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-3.5 h-3.5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow-sm z-10"
+                        >
+                          <svg className="w-2 h-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {!exportRect || exportRect.width < 5 ? (
-              <p className="text-xs text-emerald-600">Click and drag on the canvas to select a rectangle region to export.</p>
+              <p className="text-xs text-emerald-600 leading-relaxed">
+                Click and drag on the canvas to select a rectangle region to export.
+              </p>
             ) : (
               <div className="space-y-2">
                 <p className="text-xs text-emerald-600">
