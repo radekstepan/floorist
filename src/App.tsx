@@ -737,6 +737,39 @@ export function App() {
         }
       }
 
+      if (e.key === ']' || e.key === '}') {
+        setPlaced((prev) => {
+          const idx = prev.findIndex((p) => p.instanceId === selectedId);
+          if (idx !== -1 && idx < prev.length - 1) {
+            const newArr = [...prev];
+            if (e.shiftKey) {
+              const item = newArr.splice(idx, 1)[0];
+              newArr.push(item);
+            } else {
+              [newArr[idx], newArr[idx + 1]] = [newArr[idx + 1], newArr[idx]];
+            }
+            return newArr;
+          }
+          return prev;
+        });
+      }
+      if (e.key === '[' || e.key === '{') {
+        setPlaced((prev) => {
+          const idx = prev.findIndex((p) => p.instanceId === selectedId);
+          if (idx > 0) {
+            const newArr = [...prev];
+            if (e.shiftKey) {
+              const item = newArr.splice(idx, 1)[0];
+              newArr.unshift(item);
+            } else {
+              [newArr[idx], newArr[idx - 1]] = [newArr[idx - 1], newArr[idx]];
+            }
+            return newArr;
+          }
+          return prev;
+        });
+      }
+
       if (e.key.startsWith('Arrow')) {
         const step = e.shiftKey ? 12 : 1; // 12 inches vs 1 inch
         const moveAmount = step * (scale.pixelsPerInch || 4);
@@ -1871,44 +1904,90 @@ export function App() {
                 </svg>
                 Duplicate (D)
               </button>
-              <button
-                onClick={() => {
-                  setPlaced((prev) => {
-                    const idx = prev.findIndex((p) => p.instanceId === selectedId);
-                    if (idx < prev.length - 1) {
-                      const newArr = [...prev];
-                      [newArr[idx], newArr[idx + 1]] = [newArr[idx + 1], newArr[idx]];
-                      return newArr;
-                    }
-                    return prev;
-                  });
-                }}
-                className="w-full flex items-center gap-2 px-3 py-2 bg-gray-50 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-100 transition"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
-                </svg>
-                Bring Forward
-              </button>
-              <button
-                onClick={() => {
-                  setPlaced((prev) => {
-                    const idx = prev.findIndex((p) => p.instanceId === selectedId);
-                    if (idx > 0) {
-                      const newArr = [...prev];
-                      [newArr[idx], newArr[idx - 1]] = [newArr[idx - 1], newArr[idx]];
-                      return newArr;
-                    }
-                    return prev;
-                  });
-                }}
-                className="w-full flex items-center gap-2 px-3 py-2 bg-gray-50 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-100 transition"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                </svg>
-                Send Backward
-              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => {
+                    setPlaced((prev) => {
+                      const idx = prev.findIndex((p) => p.instanceId === selectedId);
+                      if (idx !== -1 && idx < prev.length - 1) {
+                        const newArr = [...prev];
+                        [newArr[idx], newArr[idx + 1]] = [newArr[idx + 1], newArr[idx]];
+                        return newArr;
+                      }
+                      return prev;
+                    });
+                  }}
+                  className="flex items-center justify-center gap-1.5 px-2 py-2 bg-gray-50 text-gray-700 rounded-lg text-[11px] font-medium hover:bg-gray-100 transition border border-gray-200"
+                  title="Bring Forward (])"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+                  </svg>
+                  Forward
+                </button>
+                <button
+                  onClick={() => {
+                    setPlaced((prev) => {
+                      const idx = prev.findIndex((p) => p.instanceId === selectedId);
+                      if (idx > 0) {
+                        const newArr = [...prev];
+                        [newArr[idx], newArr[idx - 1]] = [newArr[idx - 1], newArr[idx]];
+                        return newArr;
+                      }
+                      return prev;
+                    });
+                  }}
+                  className="flex items-center justify-center gap-1.5 px-2 py-2 bg-gray-50 text-gray-700 rounded-lg text-[11px] font-medium hover:bg-gray-100 transition border border-gray-200"
+                  title="Send Backward ([)"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                  Backward
+                </button>
+                <button
+                  onClick={() => {
+                    setPlaced((prev) => {
+                      const idx = prev.findIndex((p) => p.instanceId === selectedId);
+                      if (idx !== -1 && idx < prev.length - 1) {
+                        const newArr = [...prev];
+                        const item = newArr.splice(idx, 1)[0];
+                        newArr.push(item);
+                        return newArr;
+                      }
+                      return prev;
+                    });
+                  }}
+                  className="flex items-center justify-center gap-1.5 px-2 py-2 bg-gray-50 text-gray-700 rounded-lg text-[11px] font-medium hover:bg-gray-100 transition border border-gray-200"
+                  title="Bring to Front (Shift + ])"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 11l7-7 7 7M5 19l7-7 7 7" />
+                  </svg>
+                  To Front
+                </button>
+                <button
+                  onClick={() => {
+                    setPlaced((prev) => {
+                      const idx = prev.findIndex((p) => p.instanceId === selectedId);
+                      if (idx > 0) {
+                        const newArr = [...prev];
+                        const item = newArr.splice(idx, 1)[0];
+                        newArr.unshift(item);
+                        return newArr;
+                      }
+                      return prev;
+                    });
+                  }}
+                  className="flex items-center justify-center gap-1.5 px-2 py-2 bg-gray-50 text-gray-700 rounded-lg text-[11px] font-medium hover:bg-gray-100 transition border border-gray-200"
+                  title="Send to Back (Shift + [)"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 13l-7 7-7-7m14-8l-7 7-7-7" />
+                  </svg>
+                  To Back
+                </button>
+              </div>
               <button
                 onClick={() => {
                   setPlaced((prev) => prev.filter((p) => p.instanceId !== selectedId));
@@ -1940,6 +2019,8 @@ export function App() {
                     ['R', 'Rotate 90°'],
                     ['F', 'Flip horizontal'],
                     ['D', 'Duplicate item'],
+                    ['[ / ]', 'Send back / forward'],
+                    ['{ / }', 'Send to back / front'],
                     ['Del', 'Delete item'],
                     ['Esc', 'Cancel / Deselect'],
                     ['Scroll', 'Zoom in/out'],
@@ -1964,7 +2045,7 @@ export function App() {
                   </p>
                 </div>
                 <div className="max-h-48 overflow-y-auto px-2 pb-2 space-y-0.5">
-                  {placed.map((p) => {
+                  {[...placed].reverse().map((p) => {
                     const tmpl = furnitureCatalog.find((f) => f.id === p.templateId);
                     if (!tmpl) return null;
                     return (
