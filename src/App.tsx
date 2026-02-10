@@ -1,7 +1,8 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { FurnitureTemplate, PlacedFurniture, ScaleConfig, AppMode, ExportRect, SavedDesign } from './types';
 import { furnitureCatalog, categories } from './data/furniture';
 import { cn } from './utils/cn';
+import { useHistory } from './hooks/useHistory';
 
 let instanceCounter = 0;
 function genId() {
@@ -205,8 +206,34 @@ function drawLabel(
 export function App() {
   const [floorplanImg, setFloorplanImg] = useState<HTMLImageElement | null>(null);
   const [floorplanDataUrl, setFloorplanDataUrl] = useState<string>('');
-  const [scale, setScale] = useState<ScaleConfig>({ pixelsPerInch: 4, isCalibrated: false });
-  const [placed, setPlaced] = useState<PlacedFurniture[]>([]);
+  const { state: hState, setState: setHState, undo, redo, canUndo, canRedo, resetHistory, pushHistory } = useHistory({
+    placed: [] as PlacedFurniture[],
+    scale: { pixelsPerInch: 4, isCalibrated: false } as ScaleConfig,
+    savedExportRects: [] as ExportRect[]
+  });
+
+  const { placed, scale, savedExportRects } = hState;
+
+  const setPlaced = useCallback((updater: PlacedFurniture[] | ((prev: PlacedFurniture[]) => PlacedFurniture[]), save = true) => {
+    setHState(prev => ({
+      ...prev,
+      placed: typeof updater === 'function' ? (updater as any)(prev.placed) : updater
+    }), save);
+  }, [setHState]);
+
+  const setScale = useCallback((updater: ScaleConfig | ((prev: ScaleConfig) => ScaleConfig), save = true) => {
+    setHState(prev => ({
+      ...prev,
+      scale: typeof updater === 'function' ? (updater as any)(prev.scale) : updater
+    }), save);
+  }, [setHState]);
+
+  const setSavedExportRects = useCallback((updater: ExportRect[] | ((prev: ExportRect[]) => ExportRect[]), save = true) => {
+    setHState(prev => ({
+      ...prev,
+      savedExportRects: typeof updater === 'function' ? (updater as any)(prev.savedExportRects) : updater
+    }), save);
+  }, [setHState]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mode, setMode] = useState<AppMode>('select');
   const [activeFurniture, setActiveFurniture] = useState<string | null>(null);
@@ -266,7 +293,6 @@ export function App() {
     startY: number;
   }>({ isDrawing: false, startX: 0, startY: 0 });
   const [exportRect, setExportRect] = useState<ExportRect | null>(null);
-  const [savedExportRects, setSavedExportRects] = useState<ExportRect[]>([]);
 
   // Canvas dimensions
   const [canvasSize, setCanvasSize] = useState({ width: 1200, height: 800 });
@@ -333,8 +359,11 @@ export function App() {
     img.onload = () => {
       setFloorplanImg(img);
       setFloorplanDataUrl(design.floorplanDataUrl);
-      setPlaced(design.placed);
-      setScale(design.scale);
+      resetHistory({
+        placed: design.placed,
+        scale: design.scale,
+        savedExportRects: design.exportRects || []
+      });
       setCanvasSize({ width: design.canvasWidth, height: design.canvasHeight });
       setCurrentDesignId(design.id);
       localStorage.setItem('floorist-current-design-id', design.id);
@@ -362,8 +391,6 @@ export function App() {
           setZoomLevel(Math.max(0.1, fitZoom));
         }
       }
-
-      setSavedExportRects(design.exportRects || []);
     };
     img.src = design.floorplanDataUrl;
   }, []);
@@ -403,8 +430,11 @@ export function App() {
   const startNewDesign = useCallback(() => {
     setFloorplanImg(null);
     setFloorplanDataUrl('');
-    setPlaced([]);
-    setScale({ pixelsPerInch: 4, isCalibrated: false });
+    resetHistory({
+      placed: [],
+      scale: { pixelsPerInch: 4, isCalibrated: false },
+      savedExportRects: []
+    });
     setCanvasSize({ width: 1200, height: 800 });
     setCurrentDesignId(null);
     localStorage.removeItem('floorist-current-design-id');
@@ -415,7 +445,6 @@ export function App() {
     setZoomLevel(1);
     setShowDesignsPanel(false);
     setMode('select');
-    setSavedExportRects([]);
     setExportRect(null);
   }, []);
 
@@ -611,7 +640,8 @@ export function App() {
             p.instanceId === dragRef.current.instanceId
               ? { ...p, x: dragRef.current.startObjX + dx, y: dragRef.current.startObjY + dy }
               : p
-          )
+          ),
+          false
         );
       }
 
@@ -639,6 +669,9 @@ export function App() {
   );
 
   const handleMouseUp = useCallback(() => {
+    if (dragRef.current.isDragging) {
+      pushHistory({ ...hState });
+    }
     dragRef.current.isDragging = false;
     dragRef.current.instanceId = null;
     panRef.current.isPanning = false;
@@ -659,7 +692,7 @@ export function App() {
         });
       }
     }
-  }, [mode, exportRect]);
+  }, [mode, exportRect, hState, pushHistory]);
 
   // ─── Zoom with wheel ─────────────────────────────────────────────────────
 
@@ -689,6 +722,20 @@ export function App() {
         document.activeElement?.tagName === 'INPUT' ||
         document.activeElement?.tagName === 'TEXTAREA'
       ) {
+        return;
+      }
+
+      // Undo / Redo
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        if (e.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+        redo();
         return;
       }
 
@@ -793,7 +840,7 @@ export function App() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [selectedId, placed, scale]);
+  }, [selectedId, placed, scale, undo, redo]);
 
   // ─── Canvas rendering ────────────────────────────────────────────────────
 
@@ -1658,7 +1705,37 @@ export function App() {
           )}
 
           <div className="h-5 w-px bg-gray-200" />
-          <span className="text-[10px] text-gray-400">{placed.length} items</span>
+          <div className="flex items-center gap-0.5 px-0.5">
+            <button
+              onClick={undo}
+              disabled={!canUndo}
+              title="Undo (Cmd+Z)"
+              className={cn(
+                'p-1.5 rounded-md transition',
+                canUndo ? 'text-gray-600 hover:bg-white hover:text-indigo-600' : 'text-gray-300 cursor-not-allowed'
+              )}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+              </svg>
+            </button>
+            <button
+              onClick={redo}
+              disabled={!canRedo}
+              title="Redo (Cmd+Shift+Z)"
+              className={cn(
+                'p-1.5 rounded-md transition',
+                canRedo ? 'text-gray-600 hover:bg-white hover:text-indigo-600' : 'text-gray-300 cursor-not-allowed'
+              )}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 10h-10a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6" />
+              </svg>
+            </button>
+          </div>
+
+          <div className="h-5 w-px bg-gray-200" />
+          <span className="text-[10px] text-gray-400 font-medium px-2">{placed.length} items</span>
         </div>
 
         {/* Canvas */}
@@ -1796,9 +1873,11 @@ export function App() {
                   onChange={(e) => {
                     const rot = parseInt(e.target.value);
                     setPlaced((prev) =>
-                      prev.map((p) => (p.instanceId === selectedId ? { ...p, rotation: rot } : p))
+                      prev.map((p) => (p.instanceId === selectedId ? { ...p, rotation: rot } : p)),
+                      false
                     );
                   }}
+                  onMouseUp={() => pushHistory(hState)}
                   className="w-full accent-indigo-500"
                 />
                 <div className="flex gap-1">
@@ -1873,9 +1952,11 @@ export function App() {
                       onChange={(e) => {
                         const x = parseFloat(e.target.value) || 0;
                         setPlaced((prev) =>
-                          prev.map((p) => (p.instanceId === selectedId ? { ...p, x } : p))
+                          prev.map((p) => (p.instanceId === selectedId ? { ...p, x } : p)),
+                          false
                         );
                       }}
+                      onBlur={() => pushHistory(hState)}
                       className="w-full px-2 py-1 rounded border border-gray-200 text-xs bg-gray-50 focus:outline-none focus:ring-1 focus:ring-indigo-300"
                     />
                   </div>
@@ -1887,9 +1968,11 @@ export function App() {
                       onChange={(e) => {
                         const y = parseFloat(e.target.value) || 0;
                         setPlaced((prev) =>
-                          prev.map((p) => (p.instanceId === selectedId ? { ...p, y } : p))
+                          prev.map((p) => (p.instanceId === selectedId ? { ...p, y } : p)),
+                          false
                         );
                       }}
+                      onBlur={() => pushHistory(hState)}
                       className="w-full px-2 py-1 rounded border border-gray-200 text-xs bg-gray-50 focus:outline-none focus:ring-1 focus:ring-indigo-300"
                     />
                   </div>
