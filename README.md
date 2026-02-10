@@ -2,6 +2,8 @@
 
 A simple, intuitive web application for planning furniture layouts on your floorplans.
 
+![Floorist screenshot](screenshot.png)
+
 ## Features
 
 - **Upload Floorplans**: Upload your own floorplan images (JPG, PNG, SVG).
