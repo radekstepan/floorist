@@ -1,0 +1,66 @@
+# Node
+node_modules/
+
+# Build outputs
+dist/
+build/
+out/
+.vite/
+
+# Vite cache
+node_modules/.vite/
+
+# TypeScript
+*.tsbuildinfo
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment variables
+.env
+.env.*.local
+
+# Editor directories and files
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Coverage
+coverage/
+
+# Storybook
+storybook-static/
+
+# Yarn PnP
+.pnp.cjs
+.pnp.js
+
+# Temporary files
+.tmp/
+temp/
+
+# Misc
+*.local
+
+# Netlify cache
+.netlify/
+
+# Parcel
+.cache/
+
+# Generated lockfiles from editors
+package-lock.json
+
+# Ignore build reports
+reports/
+
+# Optional: keep examples and docs
+!README.md
