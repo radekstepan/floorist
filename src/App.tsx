@@ -1036,8 +1036,24 @@ export function App() {
   }, [floorplanImg, placed, selectedId, scale, viewOffset, zoomLevel, canvasSize, mode, exportRect, savedExportRects, showDimensions, calibStep, calibP1, calibP2]);
 
   useEffect(() => {
-    const id = requestAnimationFrame(render);
-    return () => cancelAnimationFrame(id);
+    let rafId: number;
+    const renderFrame = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(render);
+    };
+
+    renderFrame();
+    
+    const container = containerRef.current;
+    if (!container) return () => cancelAnimationFrame(rafId);
+
+    const observer = new ResizeObserver(renderFrame);
+    observer.observe(container);
+    
+    return () => {
+      cancelAnimationFrame(rafId);
+      observer.disconnect();
+    };
   }, [render]);
 
   // ─── Calibration finish ───────────────────────────────────────────────────
