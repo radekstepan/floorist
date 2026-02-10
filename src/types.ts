@@ -47,4 +47,6 @@ export interface SavedDesign {
   canvasWidth: number;
   canvasHeight: number;
   exportRects?: ExportRect[];
+  viewOffset?: { x: number; y: number };
+  zoomLevel?: number;
 }

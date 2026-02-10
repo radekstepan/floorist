@@ -271,16 +271,6 @@ export function App() {
   // Canvas dimensions
   const [canvasSize, setCanvasSize] = useState({ width: 1200, height: 800 });
 
-  // ─── Load saved designs on mount ─────────────────────────────────────────
-
-  useEffect(() => {
-    const designs = loadDesigns();
-    setSavedDesigns(designs);
-    if (designs.length > 0) {
-      setShowDesignsPanel(true);
-    }
-  }, []);
-
   // ─── Auto-save (debounced) ────────────────────────────────────────────────
 
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -306,10 +296,13 @@ export function App() {
         canvasWidth: canvasSize.width,
         canvasHeight: canvasSize.height,
         exportRects: savedExportRects,
+        viewOffset: viewOffset,
+        zoomLevel: zoomLevel,
       };
 
       if (!currentDesignId) {
         setCurrentDesignId(design.id);
+        localStorage.setItem('floorist-current-design-id', design.id);
       }
 
       setSavedDesigns((prev) => {
@@ -331,7 +324,7 @@ export function App() {
         clearTimeout(autoSaveTimerRef.current);
       }
     };
-  }, [placed, scale, floorplanDataUrl, canvasSize, hasUploaded, currentDesignId, designName, floorplanImg, savedExportRects]);
+  }, [placed, scale, floorplanDataUrl, canvasSize, hasUploaded, currentDesignId, designName, floorplanImg, savedExportRects, viewOffset, zoomLevel]);
 
   // ─── Load a saved design ─────────────────────────────────────────────────
 
@@ -344,25 +337,52 @@ export function App() {
       setScale(design.scale);
       setCanvasSize({ width: design.canvasWidth, height: design.canvasHeight });
       setCurrentDesignId(design.id);
+      localStorage.setItem('floorist-current-design-id', design.id);
       setDesignName(design.name);
       setHasUploaded(true);
       setShowDesignsPanel(false);
       setSelectedId(null);
-      setViewOffset({ x: 0, y: 0 });
-      setSavedExportRects(design.exportRects || []);
-
-      const container = containerRef.current;
-      if (container) {
-        const fitZoom = Math.min(
-          (container.clientWidth - 40) / img.width,
-          (container.clientHeight - 40) / img.height,
-          1
-        );
-        setZoomLevel(Math.max(0.1, fitZoom));
+      
+      if (design.viewOffset) {
+        setViewOffset(design.viewOffset);
+      } else {
+        setViewOffset({ x: 20, y: 20 });
       }
+
+      if (design.zoomLevel) {
+        setZoomLevel(design.zoomLevel);
+      } else {
+        const container = containerRef.current;
+        if (container) {
+          const fitZoom = Math.min(
+            (container.clientWidth - 40) / img.width,
+            (container.clientHeight - 40) / img.height,
+            1
+          );
+          setZoomLevel(Math.max(0.1, fitZoom));
+        }
+      }
+
+      setSavedExportRects(design.exportRects || []);
     };
     img.src = design.floorplanDataUrl;
   }, []);
+
+  // ─── Load saved designs on mount ─────────────────────────────────────────
+
+  useEffect(() => {
+    const designs = loadDesigns();
+    setSavedDesigns(designs);
+    
+    const lastId = localStorage.getItem('floorist-current-design-id');
+    const lastDesign = designs.find(d => d.id === lastId);
+    
+    if (lastDesign) {
+      loadDesign(lastDesign);
+    } else if (designs.length > 0) {
+      setShowDesignsPanel(true);
+    }
+  }, [loadDesign]);
 
   // ─── Delete a saved design ────────────────────────────────────────────────
 
@@ -374,6 +394,7 @@ export function App() {
     });
     if (currentDesignId === designId) {
       setCurrentDesignId(null);
+      localStorage.removeItem('floorist-current-design-id');
     }
   }, [currentDesignId]);
 
@@ -386,6 +407,7 @@ export function App() {
     setScale({ pixelsPerInch: 4, isCalibrated: false });
     setCanvasSize({ width: 1200, height: 800 });
     setCurrentDesignId(null);
+    localStorage.removeItem('floorist-current-design-id');
     setDesignName('Untitled Design');
     setHasUploaded(false);
     setSelectedId(null);
@@ -419,6 +441,7 @@ export function App() {
         if (!currentDesignId) {
           const newId = `design_${Date.now()}`;
           setCurrentDesignId(newId);
+          localStorage.setItem('floorist-current-design-id', newId);
           setDesignName(file.name.replace(/\.[^.]+$/, '') || 'Untitled Design');
         }
 
