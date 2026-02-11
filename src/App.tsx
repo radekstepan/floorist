@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { FurnitureTemplate, PlacedFurniture, ScaleConfig, AppMode, ExportRect, SavedDesign } from './types';
 import { furnitureCatalog, categories } from './data/furniture';
 import { cn } from './utils/cn';
@@ -10,6 +10,12 @@ function genId() {
 }
 
 const STORAGE_KEY = 'floorist-designs';
+
+const THEME_COLORS = [
+  '#94a3b8', '#64748b', '#475569', '#cbd5e1', '#d6d3d1', '#e2e8f0', // Grays/Slates
+  '#ef4444', '#f97316', '#f59e0b', '#10b981', '#3b82f6', '#6366f1', '#a855f7', // Rainbow
+  '#78350f', '#451a03', // Browns
+];
 
 // ─── localStorage helpers ───────────────────────────────────────────────────
 
@@ -75,7 +81,7 @@ function generateThumbnail(
     ctx.translate(-wPx / 2, -hPx / 2);
 
     ctx.globalAlpha = 0.85;
-    ctx.fillStyle = tmpl.color;
+    ctx.fillStyle = p.color || tmpl.color;
     ctx.strokeStyle = '#222';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
@@ -103,10 +109,11 @@ function drawFurnitureShape(
   tmpl: FurnitureTemplate,
   wPx: number,
   hPx: number,
-  opacity = 0.85
+  opacity = 0.85,
+  colorOverride?: string
 ) {
   ctx.globalAlpha = opacity;
-  ctx.fillStyle = tmpl.color;
+  ctx.fillStyle = colorOverride || tmpl.color;
   ctx.strokeStyle = '#222';
   ctx.lineWidth = 1.5;
 
@@ -153,51 +160,155 @@ function drawFurnitureShape(
   ctx.globalAlpha = 1;
 }
 
-function drawLabel(
+interface LabelInfo {
+  instanceId: string;
+  name: string;
+  dims: string;
+  x: number;
+  y: number;
+  origX: number;
+  origY: number;
+  width: number;
+  height: number;
+  fontSize: number;
+  rotation: number;
+  flippedX: boolean;
+  flippedY: boolean;
+}
+
+function getLabelData(
   ctx: CanvasRenderingContext2D,
   tmpl: FurnitureTemplate,
-  wPx: number,
-  hPx: number,
-  rotation: number = 0,
-  flippedX: boolean = false,
-  flippedY: boolean = false
-) {
+  p: PlacedFurniture,
+  scale: ScaleConfig
+): LabelInfo {
+  const wPx = tmpl.widthInches * scale.pixelsPerInch;
+  const hPx = tmpl.depthInches * scale.pixelsPerInch;
   const fontSize = Math.max(9, Math.min(14, Math.min(wPx, hPx) * 0.18));
-  ctx.save();
 
-  let cx = wPx / 2;
-  const cy = hPx / 2;
+  let lcx = wPx / 2;
+  const lcy = hPx / 2;
   if (tmpl.shape === 'L') {
-    cx = (wPx - (((tmpl.cutoutWidthInches ?? 0) / tmpl.widthInches) * wPx)) / 2;
+    lcx = (wPx - (((tmpl.cutoutWidthInches ?? 0) / tmpl.widthInches) * wPx)) / 2;
   }
 
-  ctx.translate(cx, cy);
-  ctx.scale(flippedX ? -1 : 1, flippedY ? -1 : 1);
-  ctx.rotate((-rotation * Math.PI) / 180);
+  const angle = (p.rotation * Math.PI) / 180;
+  const sX = p.flippedX ? -1 : 1;
+  const sY = p.flippedY ? -1 : 1;
+  
+  const lx = lcx;
+  const ly = lcy;
+  
+  const rx = lx - wPx / 2;
+  const ry = ly - hPx / 2;
+  
+  const fx = rx * sX;
+  const fy = ry * sY;
+  
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const rotatedX = fx * cos - fy * sin;
+  const rotatedY = fx * sin + fy * cos;
+  
+  const worldX = (p.x + wPx / 2) + rotatedX;
+  const worldY = (p.y + hPx / 2) + rotatedY;
 
+  const dims = `${tmpl.widthInches}"×${tmpl.depthInches}"`;
+  
+  ctx.font = `bold ${fontSize}px Inter, system-ui, sans-serif`;
+  const nameW = ctx.measureText(tmpl.name).width;
+  ctx.font = `bold ${fontSize * 0.85}px Inter, system-ui, sans-serif`;
+  const dimsW = ctx.measureText(dims).width;
+  
+  const width = Math.max(nameW, dimsW) + 12;
+  const height = fontSize * 2.2;
+
+  return {
+    instanceId: p.instanceId,
+    name: tmpl.name,
+    dims,
+    x: worldX,
+    y: worldY,
+    origX: worldX,
+    origY: worldY,
+    width,
+    height,
+    fontSize,
+    rotation: p.rotation,
+    flippedX: p.flippedX,
+    flippedY: p.flippedY
+  };
+}
+
+function resolveLabelCollisions(labels: LabelInfo[]) {
+  const iterations = 15;
+  const pushFactor = 0.5;
+  const springFactor = 0.03;
+  
+  for (let i = 0; i < iterations; i++) {
+    for (let j = 0; j < labels.length; j++) {
+      const a = labels[j];
+      
+      // Gentle spring back to original position
+      a.x += (a.origX - a.x) * springFactor;
+      a.y += (a.origY - a.y) * springFactor;
+      
+      for (let k = j + 1; k < labels.length; k++) {
+        const b = labels[k];
+        
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        const minW = (a.width + b.width) / 2 + 6;
+        const minH = (a.height + b.height) / 2 + 6;
+        
+        if (Math.abs(dx) < minW && Math.abs(dy) < minH) {
+          const overlapX = minW - Math.abs(dx);
+          const overlapY = minH - Math.abs(dy);
+          
+          if (overlapX < overlapY) {
+            const shiftX = overlapX * pushFactor;
+            const sign = dx > 0 ? 1 : -1;
+            a.x += sign * shiftX;
+            b.x -= sign * shiftX;
+          } else {
+            const shiftY = overlapY * pushFactor;
+            const sign = dy > 0 ? 1 : -1;
+            a.y += sign * shiftY;
+            b.y -= sign * shiftY;
+          }
+        }
+      }
+    }
+  }
+}
+
+function drawProcessedLabel(ctx: CanvasRenderingContext2D, l: LabelInfo) {
+  ctx.save();
+  ctx.translate(l.x, l.y);
+  
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.shadowColor = 'transparent';
   ctx.shadowBlur = 0;
 
-  const nameY = -fontSize * 0.6;
-  ctx.font = `bold ${fontSize}px Inter, system-ui, sans-serif`;
+  const nameY = -l.fontSize * 0.6;
+  ctx.font = `bold ${l.fontSize}px Inter, system-ui, sans-serif`;
   ctx.strokeStyle = 'rgba(0,0,0,0.9)';
   ctx.lineWidth = 4;
   ctx.lineJoin = 'round';
   ctx.miterLimit = 2;
-  ctx.strokeText(tmpl.name, 0, nameY);
+  ctx.strokeText(l.name, 0, nameY);
   ctx.fillStyle = '#fff';
-  ctx.fillText(tmpl.name, 0, nameY);
+  ctx.fillText(l.name, 0, nameY);
 
-  const dimY = fontSize * 0.5;
-  ctx.font = `bold ${fontSize * 0.85}px Inter, system-ui, sans-serif`;
+  const dimY = l.fontSize * 0.5;
+  ctx.font = `bold ${l.fontSize * 0.85}px Inter, system-ui, sans-serif`;
   ctx.strokeStyle = 'rgba(0,0,0,0.9)';
   ctx.lineWidth = 3.5;
-  ctx.strokeText(`${tmpl.widthInches}"×${tmpl.depthInches}"`, 0, dimY);
+  ctx.strokeText(l.dims, 0, dimY);
   ctx.fillStyle = '#e5e5e5';
-  ctx.fillText(`${tmpl.widthInches}"×${tmpl.depthInches}"`, 0, dimY);
-
+  ctx.fillText(l.dims, 0, dimY);
+  
   ctx.restore();
 }
 
@@ -296,6 +407,43 @@ export function App() {
 
   // Canvas dimensions
   const [canvasSize, setCanvasSize] = useState({ width: 1200, height: 800 });
+
+  // Confirmation Modal state
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm?: () => void;
+    type: 'confirm' | 'alert';
+    confirmText?: string;
+    cancelText?: string;
+    variant?: 'danger' | 'primary';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'confirm',
+    confirmText: 'Confirm',
+    cancelText: 'Cancel',
+    variant: 'primary'
+  });
+
+  const showConfirm = useCallback((config: Partial<Omit<typeof confirmConfig, 'isOpen'>> & { title: string; message: string }) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: config.title,
+      message: config.message,
+      type: config.type || 'confirm',
+      onConfirm: config.onConfirm,
+      confirmText: config.confirmText || (config.type === 'alert' ? 'OK' : 'Confirm'),
+      cancelText: config.cancelText || 'Cancel',
+      variant: config.variant || 'primary'
+    });
+  }, []);
+
+  const closeConfirm = useCallback(() => {
+    setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+  }, []);
 
   // ─── Auto-save (debounced) ────────────────────────────────────────────────
 
@@ -410,6 +558,76 @@ export function App() {
       setShowDesignsPanel(true);
     }
   }, [loadDesign]);
+
+  // ─── Export/Import all designs ───────────────────────────────────────────
+
+  const exportAllDesigns = useCallback(() => {
+    const designs = loadDesigns();
+    const blob = new Blob([JSON.stringify(designs, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `floorist-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, []);
+
+  const importAllDesigns = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const imported = JSON.parse(ev.target?.result as string) as SavedDesign[];
+        if (!Array.isArray(imported)) throw new Error('Invalid format');
+        
+        // Basic validation of the first item if exists
+        if (imported.length > 0 && (!imported[0].id || !imported[0].name)) {
+          throw new Error('Invalid design data');
+        }
+
+        const proceedWithImport = () => {
+          setSavedDesigns((prev) => {
+            const existingIds = new Set(imported.map(d => d.id));
+            const updated = [
+              ...imported,
+              ...prev.filter(d => !existingIds.has(d.id))
+            ].sort((a, b) => b.savedAt - a.savedAt);
+            
+            saveDesigns(updated);
+            return updated;
+          });
+          showConfirm({
+            title: 'Success',
+            message: 'Import successful!',
+            type: 'alert'
+          });
+        };
+
+        if (savedDesigns.length === 0) {
+          proceedWithImport();
+        } else {
+          showConfirm({
+            title: 'Import Designs',
+            message: `Import ${imported.length} designs? Existing designs with the same IDs will be overwritten.`,
+            onConfirm: proceedWithImport
+          });
+        }
+      } catch (err) {
+        console.error(err);
+        showConfirm({
+          title: 'Import Failed',
+          message: 'Failed to import designs. Please check your file.',
+          type: 'alert',
+          variant: 'danger'
+        });
+      }
+    };
+    reader.readAsText(file);
+    // Reset input so the same file can be selected again
+    e.target.value = '';
+  }, [showConfirm, savedDesigns]);
 
   // ─── Delete a saved design ────────────────────────────────────────────────
 
@@ -886,6 +1104,17 @@ export function App() {
       }
     }
 
+    // Pre-calculate labels for collision detection
+    const labels: LabelInfo[] = [];
+    if (showDimensions) {
+      for (const p of placed) {
+        const tmpl = furnitureCatalog.find((f) => f.id === p.templateId);
+        if (!tmpl) continue;
+        labels.push(getLabelData(ctx, tmpl, p, scale));
+      }
+      resolveLabelCollisions(labels);
+    }
+
     for (const p of placed) {
       const tmpl = furnitureCatalog.find((f) => f.id === p.templateId);
       if (!tmpl) continue;
@@ -903,16 +1132,12 @@ export function App() {
       ctx.shadowOffsetX = 2;
       ctx.shadowOffsetY = 2;
 
-      drawFurnitureShape(ctx, tmpl, wPx, hPx, p.instanceId === selectedId ? 0.95 : 0.8);
+      drawFurnitureShape(ctx, tmpl, wPx, hPx, p.instanceId === selectedId ? 0.95 : 0.8, p.color);
 
       ctx.shadowColor = 'transparent';
       ctx.shadowBlur = 0;
       ctx.shadowOffsetX = 0;
       ctx.shadowOffsetY = 0;
-
-      if (showDimensions) {
-        drawLabel(ctx, tmpl, wPx, hPx, p.rotation, p.flippedX, p.flippedY);
-      }
 
       if (p.instanceId === selectedId) {
         ctx.strokeStyle = '#3b82f6';
@@ -931,6 +1156,13 @@ export function App() {
       }
 
       ctx.restore();
+    }
+
+    // Draw all labels at once
+    if (showDimensions) {
+      for (const l of labels) {
+        drawProcessedLabel(ctx, l);
+      }
     }
 
     // Calibration line and dots
@@ -1094,6 +1326,14 @@ export function App() {
       ctx.fillRect(exportRect.x, exportRect.y, exportRect.width, exportRect.height);
     }
 
+    const labels: LabelInfo[] = [];
+    for (const p of placed) {
+      const tmpl = furnitureCatalog.find((f) => f.id === p.templateId);
+      if (!tmpl) continue;
+      labels.push(getLabelData(ctx, tmpl, p, scale));
+    }
+    resolveLabelCollisions(labels);
+
     for (const p of placed) {
       const tmpl = furnitureCatalog.find((f) => f.id === p.templateId);
       if (!tmpl) continue;
@@ -1106,10 +1346,13 @@ export function App() {
       ctx.scale(p.flippedX ? -1 : 1, p.flippedY ? -1 : 1);
       ctx.translate(-wPx / 2, -hPx / 2);
 
-      drawFurnitureShape(ctx, tmpl, wPx, hPx, 0.9);
-      drawLabel(ctx, tmpl, wPx, hPx, p.rotation, p.flippedX, p.flippedY);
+      drawFurnitureShape(ctx, tmpl, wPx, hPx, 0.9, p.color);
 
       ctx.restore();
+    }
+
+    for (const l of labels) {
+      drawProcessedLabel(ctx, l);
     }
 
     try {
@@ -1126,10 +1369,15 @@ export function App() {
         const dataUrl = exportCanvas.toDataURL('image/png');
         window.open(dataUrl, '_blank');
       } catch {
-        alert('Export failed. The floorplan image may have CORS restrictions.');
+        showConfirm({
+          title: 'Export Failed',
+          message: 'The floorplan image may have CORS restrictions, preventing export.',
+          type: 'alert',
+          variant: 'danger'
+        });
       }
     }
-  }, [exportRect, floorplanImg, placed, scale]);
+  }, [exportRect, floorplanImg, placed, scale, showConfirm]);
 
   // ─── Filtered furniture ───────────────────────────────────────────────────
 
@@ -1163,6 +1411,34 @@ export function App() {
                 <p className="text-indigo-200 text-xs mt-0.5">{savedDesigns.length} saved design{savedDesigns.length !== 1 ? 's' : ''}</p>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  onClick={exportAllDesigns}
+                  disabled={savedDesigns.length === 0}
+                  title={savedDesigns.length === 0 ? "No designs to export" : "Export all designs to JSON"}
+                  className={cn(
+                    "px-3 py-2 text-white rounded-lg text-sm font-medium transition flex items-center gap-2",
+                    savedDesigns.length === 0 
+                      ? "bg-white/5 opacity-40 cursor-not-allowed" 
+                      : "bg-white/10 hover:bg-white/20"
+                  )}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Export
+                </button>
+                <label className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-sm font-medium transition flex items-center gap-2 cursor-pointer">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1m-4-8l-4-4m0 0l-4 4m4-4v12" />
+                  </svg>
+                  Import
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={importAllDesigns}
+                    className="hidden"
+                  />
+                </label>
                 <button
                   onClick={startNewDesign}
                   className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg text-sm font-medium transition flex items-center gap-2"
@@ -1230,9 +1506,12 @@ export function App() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (confirm(`Delete "${design.name}"?`)) {
-                              deleteDesign(design.id);
-                            }
+                            showConfirm({
+                              title: 'Delete Design',
+                              message: `Are you sure you want to delete "${design.name}"? This action cannot be undone.`,
+                              variant: 'danger',
+                              onConfirm: () => deleteDesign(design.id)
+                            });
                           }}
                           className="absolute top-2 right-2 p-1.5 bg-red-500/90 text-white rounded-lg opacity-0 group-hover:opacity-100 transition hover:bg-red-600"
                         >
@@ -1282,39 +1561,50 @@ export function App() {
 
         {/* Management & Designs */}
         <div className="px-3 py-3 border-b border-gray-100 space-y-3">
-          {/* Saved Designs Browser */}
-          {savedDesigns.length > 0 && (
+          {/* Floorplan Split Button */}
+          <div className={cn(
+            "flex items-stretch rounded-lg border transition-all duration-200",
+            floorplanImg 
+              ? "bg-white border-gray-200 shadow-sm" 
+              : "bg-indigo-600 border-transparent shadow-md hover:shadow-lg"
+          )}>
+            <label className={cn(
+              "flex-1 flex items-center justify-center gap-2 cursor-pointer font-medium py-3 px-3 transition-colors rounded-l-lg",
+              floorplanImg 
+                ? "hover:bg-gray-50 text-gray-600 text-xs" 
+                : "hover:bg-indigo-700 text-white"
+            )}>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span className={cn(floorplanImg ? "font-semibold" : "text-sm font-bold")}>
+                {floorplanImg ? 'Change Floorplan' : 'Start with a Floorplan'}
+              </span>
+              <input type="file" accept="image/*" className="hidden" onChange={handleUpload} />
+            </label>
+            
             <button
               onClick={() => setShowDesignsPanel(true)}
-              className="w-full flex items-center justify-between gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold rounded-lg py-2 px-3 transition border border-indigo-200 shadow-sm group"
+              className={cn(
+                "px-3 flex items-center justify-center border-l transition-colors relative group rounded-r-lg",
+                floorplanImg
+                  ? "bg-white hover:bg-indigo-50 text-gray-400 border-gray-100 hover:text-indigo-600"
+                  : "bg-indigo-700 hover:bg-indigo-800 text-white border-indigo-500/30"
+              )}
+              title="Browse saved designs & backup"
             >
-              <div className="flex items-center gap-2">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                </svg>
-                <span className="text-sm">Saved Designs</span>
-              </div>
-              <span className="bg-indigo-200 text-indigo-800 text-[10px] px-2 py-0.5 rounded-full group-hover:bg-indigo-300 transition-colors">
-                {savedDesigns.length}
-              </span>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              {savedDesigns.length > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4">
+                  <span className="relative inline-flex rounded-full h-4 w-4 bg-indigo-500 text-[9px] text-white items-center justify-center font-bold shadow-sm border border-white">
+                    {savedDesigns.length}
+                  </span>
+                </span>
+              )}
             </button>
-          )}
-
-          {/* Change Floorplan */}
-          <label className={cn(
-            "flex items-center justify-center gap-2 cursor-pointer font-medium rounded-lg py-2 px-3 transition border",
-            floorplanImg 
-              ? "bg-white hover:bg-gray-50 text-gray-600 border-gray-200 text-xs shadow-sm" 
-              : "bg-indigo-600 hover:bg-indigo-700 text-white border-transparent py-3 shadow-md"
-          )}>
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <span className={cn(floorplanImg ? "" : "text-sm font-bold")}>
-              {floorplanImg ? 'Change Floorplan' : 'Start with a Floorplan'}
-            </span>
-            <input type="file" accept="image/*" className="hidden" onChange={handleUpload} />
-          </label>
+          </div>
 
           {/* Current Design Info */}
           {hasUploaded && (
@@ -1996,8 +2286,47 @@ export function App() {
               </div>
             </div>
 
-            <div className="px-4 py-3 space-y-1.5">
-              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Actions</p>
+            <div className="px-4 py-3 space-y-3">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Actions</p>
+              
+              {/* Color Picker */}
+              <div className="mb-2">
+                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 px-0.5">Item Color</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {THEME_COLORS.map((color) => (
+                    <button
+                      key={color}
+                      onClick={() => {
+                        setPlaced((prev) =>
+                          prev.map((p) => (p.instanceId === selectedId ? { ...p, color } : p))
+                        );
+                      }}
+                      className={cn(
+                        "w-5 h-5 rounded-full border border-black/5 transition-all hover:scale-110 active:scale-95",
+                        (selectedItem?.color === color || (!selectedItem?.color && selectedTemplate?.color === color))
+                          ? "ring-2 ring-indigo-500 ring-offset-1 scale-110 z-10"
+                          : ""
+                      )}
+                      style={{ backgroundColor: color }}
+                      title={color}
+                    />
+                  ))}
+                  <button
+                    onClick={() => {
+                      setPlaced((prev) =>
+                        prev.map((p) => (p.instanceId === selectedId ? { ...p, color: undefined } : p))
+                      );
+                    }}
+                    className="flex items-center justify-center w-5 h-5 rounded-full border border-gray-300 bg-white text-gray-400 hover:text-gray-600 hover:border-gray-400 transition-all hover:scale-110 active:scale-95"
+                    title="Reset to Template Color"
+                  >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
               <button
                 onClick={() => {
                   const item = placed.find((p) => p.instanceId === selectedId);
@@ -2178,7 +2507,11 @@ export function App() {
                       >
                         <span>{tmpl.icon}</span>
                         <span className="truncate flex-1">{tmpl.name}</span>
-                        <span className="text-[10px] text-gray-400">{p.rotation}°</span>
+                        <div 
+                          className="w-2.5 h-2.5 rounded-full border border-black/5" 
+                          style={{ backgroundColor: p.color || tmpl.color }}
+                        />
+                        <span className="text-[10px] text-gray-400 min-w-[24px] text-right">{p.rotation}°</span>
                       </button>
                     );
                   })}
@@ -2186,10 +2519,15 @@ export function App() {
                 <div className="px-3 pb-2">
                   <button
                     onClick={() => {
-                      if (confirm('Remove all placed furniture?')) {
-                        setPlaced([]);
-                        setSelectedId(null);
-                      }
+                      showConfirm({
+                        title: 'Clear Floorplan',
+                        message: 'Are you sure you want to remove all placed furniture items?',
+                        variant: 'danger',
+                        onConfirm: () => {
+                          setPlaced([]);
+                          setSelectedId(null);
+                        }
+                      });
                     }}
                     className="w-full py-1.5 text-[10px] text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition"
                   >
@@ -2201,6 +2539,58 @@ export function App() {
           </div>
         )}
       </div>
+
+      {/* ─── Confirmation Modal ────────────────────────────────────────────── */}
+      {confirmConfig.isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full mx-4 overflow-hidden border border-gray-100 transform transition-all scale-100">
+            <div className="p-6">
+              <div className="flex items-center gap-4 mb-4">
+                <div className={cn(
+                  "w-12 h-12 rounded-full flex items-center justify-center shrink-0",
+                  confirmConfig.variant === 'danger' ? "bg-red-100 text-red-600" : "bg-indigo-100 text-indigo-600"
+                )}>
+                  {confirmConfig.variant === 'danger' ? (
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  )}
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 leading-tight">{confirmConfig.title}</h3>
+              </div>
+              <p className="text-gray-600 leading-relaxed mb-6">{confirmConfig.message}</p>
+              <div className="flex items-center gap-3">
+                {confirmConfig.type === 'confirm' && (
+                  <button
+                    onClick={closeConfirm}
+                    className="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition-colors"
+                  >
+                    {confirmConfig.cancelText}
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    confirmConfig.onConfirm?.();
+                    closeConfirm();
+                  }}
+                  className={cn(
+                    "flex-1 px-4 py-2.5 rounded-xl font-bold text-white transition-all shadow-md active:scale-95",
+                    confirmConfig.variant === 'danger' 
+                      ? "bg-red-500 hover:bg-red-600 shadow-red-200" 
+                      : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200"
+                  )}
+                >
+                  {confirmConfig.confirmText}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -20,6 +20,7 @@ export interface PlacedFurniture {
   rotation: number;
   flippedX: boolean;
   flippedY: boolean;
+  color?: string;
 }
 
 export interface ScaleConfig {

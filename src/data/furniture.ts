@@ -6,12 +6,12 @@ export const furnitureCatalog: FurnitureTemplate[] = [
   // Living Room
   {
     id: 'sofa-3seat',
-    name: '3-Seater Sofa',
+    name: 'IKEA Kivik 3-Seater Sofa',
     category: 'Living Room',
     icon: '🛋️',
     color: '#94a3b8',
-    widthInches: 84,
-    depthInches: 36,
+    widthInches: 109,
+    depthInches: 38,
     shape: 'rect',
   },
   {
@@ -243,11 +243,11 @@ export const furnitureCatalog: FurnitureTemplate[] = [
   },
   {
     id: 'rug-large',
-    name: 'Large Rug',
+    name: 'Corryn Area Rug',
     category: 'Living Room',
     icon: '🧶',
     color: '#f5f5f4',
-    widthInches: 96,
+    widthInches: 94,
     depthInches: 120,
     shape: 'rect',
   },
