@@ -746,7 +746,7 @@ export function App() {
         }
 
         // Nub check for small items
-        const isSmall = tmpl.widthInches < 12 || tmpl.depthInches < 12;
+        const isSmall = tmpl.widthInches < 12 || tmpl.depthInches < 12 || tmpl.manualNub;
         if (isSmall) {
           // Put the nub on the longer side to avoid text (labels are usually centered)
           const useXSide = tmpl.widthInches > tmpl.depthInches;
@@ -1152,7 +1152,7 @@ export function App() {
       drawFurnitureShape(ctx, tmpl, wPx, hPx, p.instanceId === selectedId ? 0.95 : 0.8, p.color);
 
       // Draw selecting "nub" for small items
-      const isSmall = tmpl.widthInches < 12 || tmpl.depthInches < 12;
+      const isSmall = tmpl.widthInches < 12 || tmpl.depthInches < 12 || tmpl.manualNub;
       if (isSmall) {
         const useXSide = tmpl.widthInches > tmpl.depthInches;
         const nubOffsetX = useXSide ? -12 / zoomLevel : wPx / 2;

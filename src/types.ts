@@ -10,6 +10,7 @@ export interface FurnitureTemplate {
   cutoutWidthInches?: number;
   cutoutDepthInches?: number;
   url?: string;
+  manualNub?: boolean;
 }
 
 export interface PlacedFurniture {
