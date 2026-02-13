@@ -740,13 +740,30 @@ export function App() {
         const localX = dx * cos - dy * sin + wPx / 2;
         const localY = dx * sin + dy * cos + hPx / 2;
 
+        // Main body check
         if (localX >= 0 && localX <= wPx && localY >= 0 && localY <= hPx) {
           return p.instanceId;
+        }
+
+        // Nub check for small items
+        const isSmall = tmpl.widthInches < 12 || tmpl.depthInches < 12;
+        if (isSmall) {
+          // Put the nub on the longer side to avoid text (labels are usually centered)
+          const useXSide = tmpl.widthInches > tmpl.depthInches;
+          const nubOffsetX = useXSide ? -12 / zoomLevel : wPx / 2;
+          const nubOffsetY = useXSide ? hPx / 2 : -12 / zoomLevel;
+          
+          const nubHitRadius = 16 / zoomLevel;
+          const nDx = localX - nubOffsetX;
+          const nDy = localY - nubOffsetY;
+          if (nDx * nDx + nDy * nDy <= nubHitRadius * nubHitRadius) {
+            return p.instanceId;
+          }
         }
       }
       return null;
     },
-    [placed, scale]
+    [placed, scale, zoomLevel]
   );
 
   // ─── Mouse handlers ──────────────────────────────────────────────────────
@@ -1133,6 +1150,39 @@ export function App() {
       ctx.shadowOffsetY = 2;
 
       drawFurnitureShape(ctx, tmpl, wPx, hPx, p.instanceId === selectedId ? 0.95 : 0.8, p.color);
+
+      // Draw selecting "nub" for small items
+      const isSmall = tmpl.widthInches < 12 || tmpl.depthInches < 12;
+      if (isSmall) {
+        const useXSide = tmpl.widthInches > tmpl.depthInches;
+        const nubOffsetX = useXSide ? -12 / zoomLevel : wPx / 2;
+        const nubOffsetY = useXSide ? hPx / 2 : -12 / zoomLevel;
+
+        // Draw line connecting nub to item
+        ctx.beginPath();
+        ctx.moveTo(nubOffsetX, nubOffsetY);
+        ctx.lineTo(useXSide ? 0 : nubOffsetX, useXSide ? nubOffsetY : 0);
+        ctx.strokeStyle = p.instanceId === selectedId ? '#3b82f6' : '#666';
+        ctx.lineWidth = 1.5 / zoomLevel;
+        ctx.stroke();
+
+        ctx.beginPath();
+        const nubOuterSize = 8 / zoomLevel;
+        const nubInnerSize = 4 / zoomLevel;
+        
+        ctx.arc(nubOffsetX, nubOffsetY, nubOuterSize, 0, Math.PI * 2);
+        ctx.fillStyle = p.instanceId === selectedId ? '#3b82f6' : (p.color || tmpl.color);
+        ctx.fill();
+        ctx.strokeStyle = '#666';
+        ctx.lineWidth = 1 / zoomLevel;
+        ctx.stroke();
+        
+        // Inner dot
+        ctx.beginPath();
+        ctx.arc(nubOffsetX, nubOffsetY, nubInnerSize, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+      }
 
       ctx.shadowColor = 'transparent';
       ctx.shadowBlur = 0;
